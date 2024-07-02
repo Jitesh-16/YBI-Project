@@ -1,0 +1,85 @@
+# Objective
+# Develop a simple Movie Recommender System using collaborative filtering.
+
+# Import Library
+import pandas as pd
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Import Data
+# Create a small hardcoded dataset for simplicity
+movies_data = {
+    'movieId': [1, 2, 3, 4, 5],
+    'title': ['Toy Story', 'Jumanji', 'Grumpier Old Men', 'Waiting to Exhale', 'Father of the Bride Part II']
+}
+ratings_data = {
+    'userId': [1, 1, 1, 2, 2, 2, 3, 3, 3],
+    'movieId': [1, 2, 3, 1, 2, 4, 1, 3, 5],
+    'rating': [5, 3, 4, 4, 5, 3, 2, 4, 5]
+}
+
+movies = pd.DataFrame(movies_data)
+ratings = pd.DataFrame(ratings_data)
+
+# Describe Data
+print(movies.head())
+print(ratings.head())
+print(movies.info())
+print(ratings.info())
+
+# Data Preprocessing
+# Merging movies and ratings datasets
+data = pd.merge(ratings, movies, on='movieId')
+
+# Creating a pivot table
+user_movie_matrix = data.pivot_table(index='userId', columns='title', values='rating')
+
+# Fill NaN with 0
+user_movie_matrix.fillna(0, inplace=True)
+
+# Define Target Variable (y) and Feature Variables (X)
+# In collaborative filtering, the target is to predict the missing ratings.
+
+# Train Test Split
+# Skipping this step for simplicity.
+
+# Modeling
+# Calculating the cosine similarity matrix
+cosine_sim = cosine_similarity(user_movie_matrix)
+
+# Convert similarity matrix into a DataFrame
+cosine_sim_df = pd.DataFrame(cosine_sim, index=user_movie_matrix.index, columns=user_movie_matrix.index)
+
+# Function to get movie recommendations
+def get_recommendations(user_id, num_recommendations=3):
+    # Get similarity scores for the user
+    similarity_scores = cosine_sim_df[user_id]
+
+    # Sort users by similarity score and exclude the user itself
+    similar_users = similarity_scores.sort_values(ascending=False).index[1:]
+
+    # Get movies rated by the similar users
+    recommendations = pd.Series(dtype=np.float64)
+    for user in similar_users:
+        similar_user_ratings = user_movie_matrix.loc[user]
+        # Get movies that the target user has not rated
+        unseen_movies = similar_user_ratings[similar_user_ratings > 0].index.difference(user_movie_matrix.loc[user_id][user_movie_matrix.loc[user_id] > 0].index)
+        recommendations = pd.concat([recommendations, similar_user_ratings[unseen_movies]])
+
+        if len(recommendations) >= num_recommendations:
+            break
+
+    # Sort the recommendations by rating and return the top ones
+    return recommendations.sort_values(ascending=False).head(num_recommendations).index.tolist()
+
+# Model Evaluation
+# For simplicity, we'll just output recommendations
+
+# Prediction
+user_id = 1
+recommended_movies = get_recommendations(user_id)
+print(f"Recommended movies for user {user_id}: {recommended_movies}")
+
+# Explanation
+# The function 'get_recommendations' finds similar users based on the cosine similarity.
+# It recommends movies that similar users have rated highly but the target user has not seen.
